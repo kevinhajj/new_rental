@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.AspNetCore.Mvc;
+using VacationRental.Api.Helpers;
 using VacationRental.Api.Models;
 
 namespace VacationRental.Api.Controllers
@@ -28,10 +30,16 @@ namespace VacationRental.Api.Controllers
             if (!_rentals.ContainsKey(rentalId))
                 throw new ApplicationException("Rental not found");
 
-            var result = new CalendarViewModel 
+            var rental = _rentals.Values.Where(r => r.Id == rentalId).FirstOrDefault();
+            if (rental == null)
+            {
+                throw new ApplicationException("Rental not found");
+            }
+
+            var result = new CalendarViewModel
             {
                 RentalId = rentalId,
-                Dates = new List<CalendarDateViewModel>() 
+                Dates = new List<CalendarDateViewModel>()
             };
             for (var i = 0; i < nights; i++)
             {
@@ -43,10 +51,21 @@ namespace VacationRental.Api.Controllers
 
                 foreach (var booking in _bookings.Values)
                 {
-                    if (booking.RentalId == rentalId
-                        && booking.Start <= date.Date && booking.Start.AddDays(booking.Nights) > date.Date)
+                    if (booking.RentalId == rentalId)
                     {
-                        date.Bookings.Add(new CalendarBookingViewModel { Id = booking.Id });
+                        if (booking.Start <= date.Date && booking.Start.AddDays(booking.Nights) > date.Date)
+                        {
+                            date.Bookings.Add(new CalendarBookingViewModel
+                            {
+                                Id = booking.Id,
+                                Unit = booking.Unit
+                            });
+                        }
+                        if (rental.PreparationTimeInDays > 0
+                            && VacationRentalHelper.IsDateInBetween(date.Date, booking.Start.AddDays(booking.Nights), booking.Start.AddDays(booking.Nights - 1).AddDays(rental.PreparationTimeInDays)))
+                        {
+                            date.PreparationTimes.Add(new CalendarPreparationTimeViewModel { Unit = booking.Unit });
+                        }
                     }
                 }
 
